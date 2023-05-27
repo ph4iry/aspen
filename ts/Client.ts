@@ -23,7 +23,7 @@ export default class Client {
   static #terms = Object.keys(Client.#markingPeriods);
 
   async init() {
-    this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: false });
+    this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: true });
     this.page = await this.browser.newPage();
 
     await this.page.goto('http://sis.mybps.org/aspen/logon.do');
