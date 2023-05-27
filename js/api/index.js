@@ -78,6 +78,21 @@ app.get('/student/classes/:courseCode', (req, res) => __awaiter(void 0, void 0, 
         client: data.client,
     });
 }));
+app.get('/student/schedule', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const data = req.body;
+    if (!data.client) {
+        data.client = new Client();
+        yield data.client.login(data.studentId, data.password).catch(() => {
+            res.status(401).send('Failed to log in.');
+            return;
+        });
+    }
+    const schedule = yield data.client.getSchedule();
+    res.send({
+        data: schedule,
+        client: data.client,
+    });
+}));
 app.listen(port, () => {
     console.log(`Aspen SIS listening on port ${port}`);
 });
