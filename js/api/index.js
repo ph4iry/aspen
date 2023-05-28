@@ -27,7 +27,6 @@ app.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     res.send('This is an example response. To see more, try to use /student/profile with a json body with student login information.');
 }));
 app.post('/student/profile', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    res.send('profile');
     const data = req.body;
     if (!data.client) {
         data.client = new Client();
