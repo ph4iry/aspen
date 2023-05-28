@@ -32,7 +32,7 @@ app.get('/', async (req, res) => {
   res.send('This is an example response. To see more, try to use /student/profile with a json body with student login information.');
 });
 
-app.get('/student/profile', async (req, res) => {
+app.post('/student/profile', async (req, res) => {
   const data: LoginRequest = req.body;
   if (!data.client) {
     data.client = new Client();
@@ -46,7 +46,7 @@ app.get('/student/profile', async (req, res) => {
   });
 });
 
-app.get('/student/classes', async (req, res) => {
+app.post('/student/classes', async (req, res) => {
   const data: LoginRequest & ClassRequest = req.body;
   if (!data.client) {
     data.client = new Client();
@@ -66,7 +66,7 @@ app.get('/student/classes', async (req, res) => {
   });
 });
 
-app.get('/student/classes/:courseCode', async (req, res) => {
+app.post('/student/classes/:courseCode', async (req, res) => {
   const courseCode = req.params.courseCode;
 
   const data: LoginRequest & ClassRequest = req.body;
@@ -91,7 +91,7 @@ app.get('/student/classes/:courseCode', async (req, res) => {
   });
 });
 
-app.get('/student/schedule', async (req, res) => {
+app.post('/student/schedule', async (req, res) => {
 
   const data: LoginRequest = req.body;
   if (!data.client) {
