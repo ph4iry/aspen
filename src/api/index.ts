@@ -7,7 +7,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use (cors());
 // app.use(express.bodyParser)
 const port = process.env.PORT || 3000;
-import Client from '../Client.js';
+import Client from '../Session.js';
 import { CourseSearchOptions } from '../types.js';
 
 interface LoginRequest {
@@ -20,14 +20,6 @@ interface ClassRequest {
   options: CourseSearchOptions;
 }
 
-// const client = new Client();
-
-// app.post('/login', async (req, res) => {
-//   const data: LoginRequest = req.body;
-//   await client.login(data.studentId, data.password);
-//   // console.log(req.body);
-//   res.send(client);
-// });
 app.get('/', async (req, res) => {
   res.send('This is an example response. To see more, try to use /student/profile with a json body with student login information.');
 });

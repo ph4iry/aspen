@@ -2,13 +2,14 @@ import puppeteer, { Browser, Page } from 'puppeteer';
 import ClientNotReadyError from './errors/ClientNotReady.js';
 // import ClientNotReadyError from './errors/ClientNotReady.js';
 import LoginFailedError from './errors/LoginFailed.js';
-import Course from './classes/Course.js';
+import Course from './structures/Course.js';
 import { CourseSearchOptions, terms, ClassDetailSearchMethod, Category } from './types.js';
 
-export default class Client {
+export default class Session {
   browser!: Browser;
   page!: Page;
   loggedIn: boolean;
+
   constructor() {
     this.loggedIn = false;
   }
@@ -20,7 +21,7 @@ export default class Client {
     .set('q4', 'GTMp1000026Gdk')
     .set('all', 'all');
 
-  static #terms = Object.keys(Client.#markingPeriods);
+  static #terms = Object.keys(Session.#markingPeriods);
 
   async init() {
     this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: true });
@@ -45,6 +46,7 @@ export default class Client {
       .catch(() => {
         return 401;
       });
+    
     return this;
   }
 
@@ -96,7 +98,7 @@ export default class Client {
     await this.page.waitForSelector('#dataGrid');
 
     // selects the term to view
-    await this.page.select('select[name="termFilter"]', Client.#markingPeriods.get(options.term));
+    await this.page.select('select[name="termFilter"]', Session.#markingPeriods.get(options.term));
     await this.page.waitForSelector('#dataGrid');
 
     return await this.page.evaluate(() => {
@@ -306,7 +308,7 @@ export default class Client {
     await this.page.waitForSelector('#gradeTermOid');
 
     // TODO: fix this select (the selector is wrong)
-    await this.page.select('#gradeTermOid', Client.#markingPeriods.get(assignmentFilter.term));
+    await this.page.select('#gradeTermOid', Session.#markingPeriods.get(assignmentFilter.term));
     await this.page.waitForSelector('#dataGrid > table');
   
     return await this.page.evaluate((_course) => {
@@ -363,12 +365,11 @@ export default class Client {
           period: (day.match(periodRegex)?.toString().split(',')[1] as (string)),
         };
       });
-      console.log(schedule);
       return {
         name: course[0],
-        term: course[1],
+        semesters: course[1],
         schedule: schedule,
-        location: course[3],
+        roomNumber: course[3],
         teacher: course[4],
       };
     });
@@ -385,37 +386,22 @@ export default class Client {
       scheduleByClass.flat().forEach(course => {
         if (!course.schedule[0].day) return;
         for (const meeting of course.schedule) {
-          structure[meeting.day][parseInt(meeting.period) - 1] = course;
-          // if (meeting.day && meeting.period) {
-          //   console.log(structure[meeting.day][parseInt(meeting.period) - 1]);
-          //   if (structure[meeting.day][parseInt(meeting.period) - 1] && !Array.isArray(structure[meeting.day][parseInt(meeting.period) - 1])) {
-          //     structure[meeting.day][parseInt(meeting.period) - 1] = [structure[meeting.day][parseInt(meeting.period) - 1], {
-          //       name: course.name,
-          //       term: course.term,
-          //       location: course.location,
-          //       teacher: course.teacher,
-          //     }];
-          //   } else {
-          //     (structure[meeting.day][parseInt(meeting.period) - 1] as object[]).push({
-          //       name: course.name,
-          //       term: course.term,
-          //       location: course.location,
-          //       teacher: course.teacher,
-          //     });
-          //   }
-          // } else {
-          //   structure[meeting.day][parseInt(meeting.period) - 1] = {
-          //     name: course.name,
-          //     term: course.term,
-          //     location: course.location,
-          //     teacher: course.teacher,
-          //   };
-          // }
+          // console.log(course.name);
+          if (structure[meeting.day][parseInt(meeting.period) - 1]) {
+            const existing = structure[meeting.day][parseInt(meeting.period) - 1];
+            structure[meeting.day][parseInt(meeting.period) - 1] = [existing, course];
+          } else {
+            structure[meeting.day][parseInt(meeting.period) - 1] = course;
+          }
         }
       });
       
       return structure;
     })();
     return fullSchedule;
+  }
+
+  async exit() {
+    this.browser.close();
   }
 }
