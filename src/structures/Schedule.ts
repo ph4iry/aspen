@@ -9,7 +9,9 @@ interface Block {
   teacher: string,
 }
 
-type Day = Block[];
+type MultiSemesterBlock = Block[];
+
+type Day = (Block | MultiSemesterBlock)[];
 
 interface ScheduleData {
   M: Day,
@@ -19,7 +21,10 @@ interface ScheduleData {
   F: Day,
 }
 
+type ScheduleDays = 'M' | 'T' | 'W' | 'R' | 'F';
+type SchedulePeriods = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
+type ScheduleCode = `${ScheduleDays}${SchedulePeriods}`;
 
 export default class Schedule {
   M: Day;
@@ -39,4 +44,13 @@ export default class Schedule {
   getDay(day: keyof ScheduleData): Day {
     return this[day];
   }
+  
+  getPeriod(code: ScheduleCode) {
+    const day: ScheduleDays = code[0] as ScheduleDays, period: SchedulePeriods = parseInt(code[1]) as SchedulePeriods;
+    return this[day][period];
+  }
+
+  static DURATIONS = {
+
+  };
 }

@@ -4,6 +4,7 @@ import ClientNotReadyError from './errors/ClientNotReady.js';
 import LoginFailedError from './errors/LoginFailed.js';
 import Course from './structures/Course.js';
 import { CourseSearchOptions, terms, ClassDetailSearchMethod, Category } from './types.js';
+import { waitForElm } from './util.js';
 
 export default class Session {
   browser!: Browser;
@@ -66,11 +67,12 @@ export default class Session {
       return (document.querySelector('#dataGrid > table > tbody')?.lastElementChild?.lastElementChild as HTMLTableCellElement)?.innerText;
     });
     
+    
     await this.page.goto('http://sis.mybps.org/aspen/portalStudentDetail.do?navkey=myInfo.details.detail');
     this.page.waitForSelector('#mainTable');
 
-    return Object.assign(await this.page.evaluate(() => {
-      return {
+    return Object.assign(await this.page.evaluate((waitForElm) => {
+      const primary = {
         studentId: (document.querySelector('input[name="propertyValue(stdIDLocal)"]') as HTMLInputElement)?.value,
         // studentId: (table.querySelector('input[name="propertyValue(stdIDLocal)"]')).value,
         name: (document.querySelector('input[name="propertyValue(stdViewName)"]') as HTMLInputElement)?.value,
@@ -83,7 +85,16 @@ export default class Session {
         grade: (document.querySelector('input[name="propertyValue(stdGradeLevel)"]') as HTMLInputElement)?.value,
         email: (document.querySelector('input[name="propertyValue(relStdPsnOid_psnEmail01)"]') as HTMLInputElement)?.value,
       };
-    }), {
+
+      (document.querySelector('#contentArea > table:nth-child(2) > tbody > tr:nth-child(1) > td.contentContainer > table:nth-child(7) > tbody > tr:nth-child(3) > td > table > tbody > tr > td:nth-child(2) > a') as HTMLAnchorElement).click();
+      
+      const photo = waitForElm('#propertyValue\\(relStdPsnOid_psnPhoOIDPrim\\)-span > img').then((photo) => (photo as HTMLImageElement).src);
+
+      return {
+        ...primary,
+        studentPhoto: photo,
+      }; // document.querySelector("#propertyValue\\(relStdPsnOid_psnPhoOIDPrim\\)-span > img")
+    }, waitForElm), {
       gpa: _weightedGPA
     });
   }
