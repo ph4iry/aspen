@@ -1,10 +1,8 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
 import ClientNotReadyError from './errors/ClientNotReady.js';
-// import ClientNotReadyError from './errors/ClientNotReady.js';
 import LoginFailedError from './errors/LoginFailed.js';
 import Course from './structures/Course.js';
 import { CourseSearchOptions, terms, ClassDetailSearchMethod, Category } from './types.js';
-import { waitForElm } from './util.js';
 
 export default class Session {
   browser!: Browser;
@@ -21,8 +19,6 @@ export default class Session {
     .set('q3', 'GTMp1000026Gdj')
     .set('q4', 'GTMp1000026Gdk')
     .set('all', 'all');
-
-  static #terms = Object.keys(Session.#markingPeriods);
 
   async init() {
     this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: true });
@@ -69,9 +65,19 @@ export default class Session {
     
     
     await this.page.goto('http://sis.mybps.org/aspen/portalStudentDetail.do?navkey=myInfo.details.detail');
-    this.page.waitForSelector('#mainTable');
 
-    return Object.assign(await this.page.evaluate((waitForElm) => {
+    await this.page.click('#contentArea > table:nth-child(2) > tbody > tr:nth-child(1) > td.contentContainer > table:nth-child(7) > tbody > tr:nth-child(3) > td > table > tbody > tr > td:nth-child(2) > a')
+      .then(async () => await this.page.waitForSelector('#propertyValue\\(relStdPsnOid_psnPhoOIDPrim\\)-span > img'));
+
+    const _photo = await this.page.evaluate(() => {
+      return (document.querySelector('#propertyValue\\(relStdPsnOid_psnPhoOIDPrim\\)-span > img') as HTMLImageElement).src;
+    });
+
+    await this.page.goto('http://sis.mybps.org/aspen/portalStudentDetail.do?navkey=myInfo.details.detail');
+
+    await this.page.waitForSelector('#mainTable');
+
+    return Object.assign(await this.page.evaluate(() => {
       const primary = {
         studentId: (document.querySelector('input[name="propertyValue(stdIDLocal)"]') as HTMLInputElement)?.value,
         // studentId: (table.querySelector('input[name="propertyValue(stdIDLocal)"]')).value,
@@ -86,16 +92,10 @@ export default class Session {
         email: (document.querySelector('input[name="propertyValue(relStdPsnOid_psnEmail01)"]') as HTMLInputElement)?.value,
       };
 
-      (document.querySelector('#contentArea > table:nth-child(2) > tbody > tr:nth-child(1) > td.contentContainer > table:nth-child(7) > tbody > tr:nth-child(3) > td > table > tbody > tr > td:nth-child(2) > a') as HTMLAnchorElement).click();
-      
-      const photo = waitForElm('#propertyValue\\(relStdPsnOid_psnPhoOIDPrim\\)-span > img').then((photo) => (photo as HTMLImageElement).src);
-
-      return {
-        ...primary,
-        studentPhoto: photo,
-      }; // document.querySelector("#propertyValue\\(relStdPsnOid_psnPhoOIDPrim\\)-span > img")
-    }, waitForElm), {
-      gpa: _weightedGPA
+      return primary; // document.querySelector("#propertyValue\\(relStdPsnOid_psnPhoOIDPrim\\)-span > img")
+    }), {
+      gpa: _weightedGPA,
+      studentPhoto: _photo,
     });
   }
 
@@ -332,7 +332,7 @@ export default class Session {
           
           return {
             assignmentName: _cols[1],
-            category: _course?.categories.find((_category) => _category.name === _cols[2] ),
+            category: _course?.categories.find((_category) => _category.name === _cols[2]),
             dateAssigned: _cols[3],
             dateDue: _cols[4],
             score: {

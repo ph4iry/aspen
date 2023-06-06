@@ -6,5 +6,5 @@ import Session from './Session.js';
   const aspen = await new Session().login(process.env.USERNAME!, process.env.PASSWORD!);
   const schedule = await aspen.getStudentInfo();
   console.log(schedule);
-  aspen.exit().catch();
-})();
+  return aspen;
+})().then((aspen) => aspen.exit().catch());
