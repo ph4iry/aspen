@@ -57,4 +57,5 @@ export interface CourseData {
     tardy: string,
     dismissal: string,
   },
+  schedule?: object,
 }

@@ -1,14 +1,14 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
 import ClientNotReadyError from './errors/ClientNotReady.js';
-// import ClientNotReadyError from './errors/ClientNotReady.js';
 import LoginFailedError from './errors/LoginFailed.js';
-import Course from './classes/Course.js';
+import Course from './structures/Course.js';
 import { CourseSearchOptions, terms, ClassDetailSearchMethod, Category } from './types.js';
 
-export default class Client {
+export default class Session {
   browser!: Browser;
   page!: Page;
   loggedIn: boolean;
+
   constructor() {
     this.loggedIn = false;
   }
@@ -19,8 +19,6 @@ export default class Client {
     .set('q3', 'GTMp1000026Gdj')
     .set('q4', 'GTMp1000026Gdk')
     .set('all', 'all');
-
-  static #terms = Object.keys(Client.#markingPeriods);
 
   async init() {
     this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: true });
@@ -45,6 +43,7 @@ export default class Client {
       .catch(() => {
         return 401;
       });
+    
     return this;
   }
 
@@ -64,11 +63,22 @@ export default class Client {
       return (document.querySelector('#dataGrid > table > tbody')?.lastElementChild?.lastElementChild as HTMLTableCellElement)?.innerText;
     });
     
+    
     await this.page.goto('http://sis.mybps.org/aspen/portalStudentDetail.do?navkey=myInfo.details.detail');
-    this.page.waitForSelector('#mainTable');
+
+    await this.page.click('#contentArea > table:nth-child(2) > tbody > tr:nth-child(1) > td.contentContainer > table:nth-child(7) > tbody > tr:nth-child(3) > td > table > tbody > tr > td:nth-child(2) > a')
+      .then(async () => await this.page.waitForSelector('#propertyValue\\(relStdPsnOid_psnPhoOIDPrim\\)-span > img'));
+
+    const _photo = await this.page.evaluate(() => {
+      return (document.querySelector('#propertyValue\\(relStdPsnOid_psnPhoOIDPrim\\)-span > img') as HTMLImageElement).src;
+    });
+
+    await this.page.goto('http://sis.mybps.org/aspen/portalStudentDetail.do?navkey=myInfo.details.detail');
+
+    await this.page.waitForSelector('#mainTable');
 
     return Object.assign(await this.page.evaluate(() => {
-      return {
+      const primary = {
         studentId: (document.querySelector('input[name="propertyValue(stdIDLocal)"]') as HTMLInputElement)?.value,
         // studentId: (table.querySelector('input[name="propertyValue(stdIDLocal)"]')).value,
         name: (document.querySelector('input[name="propertyValue(stdViewName)"]') as HTMLInputElement)?.value,
@@ -81,8 +91,11 @@ export default class Client {
         grade: (document.querySelector('input[name="propertyValue(stdGradeLevel)"]') as HTMLInputElement)?.value,
         email: (document.querySelector('input[name="propertyValue(relStdPsnOid_psnEmail01)"]') as HTMLInputElement)?.value,
       };
+
+      return primary; // document.querySelector("#propertyValue\\(relStdPsnOid_psnPhoOIDPrim\\)-span > img")
     }), {
-      gpa: _weightedGPA
+      gpa: _weightedGPA,
+      studentPhoto: _photo,
     });
   }
 
@@ -96,7 +109,7 @@ export default class Client {
     await this.page.waitForSelector('#dataGrid');
 
     // selects the term to view
-    await this.page.select('select[name="termFilter"]', Client.#markingPeriods.get(options.term));
+    await this.page.select('select[name="termFilter"]', Session.#markingPeriods.get(options.term));
     await this.page.waitForSelector('#dataGrid');
 
     return await this.page.evaluate(() => {
@@ -306,7 +319,7 @@ export default class Client {
     await this.page.waitForSelector('#gradeTermOid');
 
     // TODO: fix this select (the selector is wrong)
-    await this.page.select('#gradeTermOid', Client.#markingPeriods.get(assignmentFilter.term));
+    await this.page.select('#gradeTermOid', Session.#markingPeriods.get(assignmentFilter.term));
     await this.page.waitForSelector('#dataGrid > table');
   
     return await this.page.evaluate((_course) => {
@@ -319,7 +332,7 @@ export default class Client {
           
           return {
             assignmentName: _cols[1],
-            category: _course?.categories.find((_category) => _category.name === _cols[2] ),
+            category: _course?.categories.find((_category) => _category.name === _cols[2]),
             dateAssigned: _cols[3],
             dateDue: _cols[4],
             score: {
@@ -363,12 +376,11 @@ export default class Client {
           period: (day.match(periodRegex)?.toString().split(',')[1] as (string)),
         };
       });
-      console.log(schedule);
       return {
         name: course[0],
-        term: course[1],
+        semesters: course[1],
         schedule: schedule,
-        location: course[3],
+        roomNumber: course[3],
         teacher: course[4],
       };
     });
@@ -385,37 +397,22 @@ export default class Client {
       scheduleByClass.flat().forEach(course => {
         if (!course.schedule[0].day) return;
         for (const meeting of course.schedule) {
-          structure[meeting.day][parseInt(meeting.period) - 1] = course;
-          // if (meeting.day && meeting.period) {
-          //   console.log(structure[meeting.day][parseInt(meeting.period) - 1]);
-          //   if (structure[meeting.day][parseInt(meeting.period) - 1] && !Array.isArray(structure[meeting.day][parseInt(meeting.period) - 1])) {
-          //     structure[meeting.day][parseInt(meeting.period) - 1] = [structure[meeting.day][parseInt(meeting.period) - 1], {
-          //       name: course.name,
-          //       term: course.term,
-          //       location: course.location,
-          //       teacher: course.teacher,
-          //     }];
-          //   } else {
-          //     (structure[meeting.day][parseInt(meeting.period) - 1] as object[]).push({
-          //       name: course.name,
-          //       term: course.term,
-          //       location: course.location,
-          //       teacher: course.teacher,
-          //     });
-          //   }
-          // } else {
-          //   structure[meeting.day][parseInt(meeting.period) - 1] = {
-          //     name: course.name,
-          //     term: course.term,
-          //     location: course.location,
-          //     teacher: course.teacher,
-          //   };
-          // }
+          // console.log(course.name);
+          if (structure[meeting.day][parseInt(meeting.period) - 1]) {
+            const existing = structure[meeting.day][parseInt(meeting.period) - 1];
+            structure[meeting.day][parseInt(meeting.period) - 1] = [existing, course];
+          } else {
+            structure[meeting.day][parseInt(meeting.period) - 1] = course;
+          }
         }
       });
       
       return structure;
     })();
     return fullSchedule;
+  }
+
+  async exit() {
+    this.browser.close();
   }
 }
