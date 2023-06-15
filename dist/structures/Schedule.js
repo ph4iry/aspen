@@ -1,4 +1,4 @@
-class Schedule {
+export default class Schedule {
     constructor(schedule) {
         this.M = schedule.M;
         this.T = schedule.T;
@@ -15,4 +15,3 @@ class Schedule {
     }
 }
 Schedule.DURATIONS = {};
-export default Schedule;

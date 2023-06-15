@@ -17,7 +17,7 @@ import puppeteer from 'puppeteer';
 import ClientNotReadyError from './errors/ClientNotReady.js';
 import LoginFailedError from './errors/LoginFailed.js';
 import Course from './structures/Course.js';
-class Session {
+export default class Session {
     constructor() {
         _Session_instances.add(this);
         this.loggedIn = false;
@@ -390,4 +390,3 @@ _Session_markingPeriods = { value: new Map()
         .set('q3', 'GTMp1000026Gdj')
         .set('q4', 'GTMp1000026Gdk')
         .set('all', 'all') };
-export default Session;
