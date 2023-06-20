@@ -11,9 +11,12 @@ import 'dotenv/config.js';
 import Session from './Session.js';
 (function () {
     return __awaiter(this, void 0, void 0, function* () {
-        const aspen = yield new Session().login(process.env.USERNAME, process.env.PASSWORD);
-        const schedule = yield aspen.getStudentInfo();
-        console.log(schedule);
+        const aspen = new Session();
+        yield aspen.login(process.env.STUDENT_ID, process.env.PASSWORD);
+        const schedule = yield aspen.getSchedule();
+        const classes = yield aspen.getClasses({ year: 'current', term: 'q4' });
+        schedule.loadCourses(classes);
+        console.log(schedule.M[0]);
         return aspen;
     });
 })().then((aspen) => aspen.exit().catch());

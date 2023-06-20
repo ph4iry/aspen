@@ -3,11 +3,13 @@ import ClientNotReadyError from './errors/ClientNotReady.js';
 import LoginFailedError from './errors/LoginFailed.js';
 import Course from './structures/Course.js';
 import { CourseSearchOptions, terms, ClassDetailSearchMethod, Category } from './types.js';
+import Schedule, { Day } from './structures/Schedule.js';
 
 export default class Session {
   browser!: Browser;
   page!: Page;
   loggedIn: boolean;
+  courses?: Course[];
 
   constructor() {
     this.loggedIn = false;
@@ -21,7 +23,7 @@ export default class Session {
     .set('all', 'all');
 
   async init() {
-    this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: true });
+    this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: false });
     this.page = await this.browser.newPage();
 
     await this.page.goto('http://sis.mybps.org/aspen/logon.do');
@@ -32,9 +34,10 @@ export default class Session {
     await this.page.type('input#username', id);
     await this.page.type('input#password', password);
     await this.page.evaluate(() => (<HTMLButtonElement>document.querySelector('#logonButton')).click())
-      .then(() => this.page?.waitForNavigation({ waitUntil: 'networkidle2' }))
+      .then(() => this.page!.waitForNavigation({ waitUntil: 'networkidle2' }))
       .then(async () => {
-        if (await this.page.$('div.messageText')) {
+        const text = await this.page.$('#messageWindow > table > tbody > tr:nth-child(3) > td:nth-child(2) > div');
+        if (text) {
           throw new LoginFailedError();
         } else {
           this.loggedIn = true;
@@ -112,7 +115,7 @@ export default class Session {
     await this.page.select('select[name="termFilter"]', Session.#markingPeriods.get(options.term));
     await this.page.waitForSelector('#dataGrid');
 
-    return await this.page.evaluate(() => {
+    this.courses = await this.page.evaluate(() => {
       const _rows = document.querySelectorAll('#dataGrid tr');
       const classes: (string[])[] = [];
       _rows.forEach(_row => {
@@ -148,6 +151,8 @@ export default class Session {
         });
       });
     });
+
+    return this.courses;
   }
 
   async getClassDetailsByElementId(id: string, options?: CourseSearchOptions) {
@@ -377,39 +382,35 @@ export default class Session {
         };
       });
       return {
-        name: course[0],
-        semesters: course[1],
         schedule: schedule,
-        roomNumber: course[3],
-        teacher: course[4],
+        course: {
+          courseName: course[0],
+          semesters: course[1],
+          roomNumber: course[3],
+          teacherName: course[4],
+        }
       };
     });
 
     const fullSchedule = (() => {
-      const structure: {  M: (object | object[])[], T: (object | object[])[], W: (object | object[])[], R: (object | object[])[], F: (object | object[])[] } = {
-        M: [],
-        T: [],
-        W: [],
-        R: [],
-        F: [],
+      const structure: {  M: Day, T: Day, W: Day, R: Day, F: Day } = {
+        M: [[], [], [], [], [], [], []],
+        T: [[], [], [], [], [], [], []],
+        W: [[], [], [], [], [], [], []],
+        R: [[], [], [], [], [], [], []],
+        F: [[], [], [], [], [], [], []],
       };
 
       scheduleByClass.flat().forEach(course => {
         if (!course.schedule[0].day) return;
         for (const meeting of course.schedule) {
-          // console.log(course.name);
-          if (structure[meeting.day][parseInt(meeting.period) - 1]) {
-            const existing = structure[meeting.day][parseInt(meeting.period) - 1];
-            structure[meeting.day][parseInt(meeting.period) - 1] = [existing, course];
-          } else {
-            structure[meeting.day][parseInt(meeting.period) - 1] = course;
-          }
+          structure[meeting.day][parseInt(meeting.period) - 1].push(course);
         }
       });
       
       return structure;
     })();
-    return fullSchedule;
+    return new Schedule(fullSchedule);
   }
 
   async exit() {

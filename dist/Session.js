@@ -17,14 +17,15 @@ import puppeteer from 'puppeteer';
 import ClientNotReadyError from './errors/ClientNotReady.js';
 import LoginFailedError from './errors/LoginFailed.js';
 import Course from './structures/Course.js';
-export default class Session {
+import Schedule from './structures/Schedule.js';
+class Session {
     constructor() {
         _Session_instances.add(this);
         this.loggedIn = false;
     }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
-            this.browser = yield puppeteer.launch({ args: ['--no-sandbox'], headless: true });
+            this.browser = yield puppeteer.launch({ args: ['--no-sandbox'], headless: false });
             this.page = yield this.browser.newPage();
             yield this.page.goto('http://sis.mybps.org/aspen/logon.do');
         });
@@ -35,9 +36,10 @@ export default class Session {
             yield this.page.type('input#username', id);
             yield this.page.type('input#password', password);
             yield this.page.evaluate(() => document.querySelector('#logonButton').click())
-                .then(() => { var _b; return (_b = this.page) === null || _b === void 0 ? void 0 : _b.waitForNavigation({ waitUntil: 'networkidle2' }); })
+                .then(() => this.page.waitForNavigation({ waitUntil: 'networkidle2' }))
                 .then(() => __awaiter(this, void 0, void 0, function* () {
-                if (yield this.page.$('div.messageText')) {
+                const text = yield this.page.$('#messageWindow > table > tbody > tr:nth-child(3) > td:nth-child(2) > div');
+                if (text) {
                     throw new LoginFailedError();
                 }
                 else {
@@ -101,7 +103,7 @@ export default class Session {
             // selects the term to view
             yield this.page.select('select[name="termFilter"]', __classPrivateFieldGet(Session, _a, "f", _Session_markingPeriods).get(options.term));
             yield this.page.waitForSelector('#dataGrid');
-            return yield this.page.evaluate(() => {
+            this.courses = yield this.page.evaluate(() => {
                 const _rows = document.querySelectorAll('#dataGrid tr');
                 const classes = [];
                 _rows.forEach(_row => {
@@ -137,6 +139,7 @@ export default class Session {
                     });
                 });
             });
+            return this.courses;
         });
     }
     getClassDetailsByElementId(id, options) {
@@ -339,38 +342,33 @@ export default class Session {
                     };
                 });
                 return {
-                    name: course[0],
-                    semesters: course[1],
                     schedule: schedule,
-                    roomNumber: course[3],
-                    teacher: course[4],
+                    course: {
+                        courseName: course[0],
+                        semesters: course[1],
+                        roomNumber: course[3],
+                        teacherName: course[4],
+                    }
                 };
             });
             const fullSchedule = (() => {
                 const structure = {
-                    M: [],
-                    T: [],
-                    W: [],
-                    R: [],
-                    F: [],
+                    M: [[], [], [], [], [], [], []],
+                    T: [[], [], [], [], [], [], []],
+                    W: [[], [], [], [], [], [], []],
+                    R: [[], [], [], [], [], [], []],
+                    F: [[], [], [], [], [], [], []],
                 };
                 scheduleByClass.flat().forEach(course => {
                     if (!course.schedule[0].day)
                         return;
                     for (const meeting of course.schedule) {
-                        // console.log(course.name);
-                        if (structure[meeting.day][parseInt(meeting.period) - 1]) {
-                            const existing = structure[meeting.day][parseInt(meeting.period) - 1];
-                            structure[meeting.day][parseInt(meeting.period) - 1] = [existing, course];
-                        }
-                        else {
-                            structure[meeting.day][parseInt(meeting.period) - 1] = course;
-                        }
+                        structure[meeting.day][parseInt(meeting.period) - 1].push(course);
                     }
                 });
                 return structure;
             })();
-            return fullSchedule;
+            return new Schedule(fullSchedule);
         });
     }
     exit() {
@@ -390,3 +388,4 @@ _Session_markingPeriods = { value: new Map()
         .set('q3', 'GTMp1000026Gdj')
         .set('q4', 'GTMp1000026Gdk')
         .set('all', 'all') };
+export default Session;

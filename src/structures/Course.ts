@@ -1,10 +1,14 @@
 import { CourseData } from '../types';
 
-interface AttendanceChart {
+export interface AttendanceChart {
   absences: number,
   tardy: number,
   dismissal: number,
 }
+
+// interface GradeBook {
+//   categories: 
+// }
 
 export default class Course {
   courseName: string;
@@ -16,10 +20,10 @@ export default class Course {
   roomNumber: string;
   grade: string | null;
   attendance: AttendanceChart;
-  schedule?: object;
+  schedule: object | null;
 
   constructor(data: CourseData) {
-    const { courseName, courseCode, courseElementId, sectionNumber, semesters, teacherName, roomNumber, grade, attendance } = data;
+    const { courseName, courseCode, courseElementId, sectionNumber, semesters, teacherName, roomNumber, grade, attendance, schedule } = data;
     this.courseName = courseName;
     this.courseCode = courseCode;
     this.courseElementId = courseElementId;
@@ -33,44 +37,8 @@ export default class Course {
       tardy: parseInt(attendance.tardy),
       dismissal: parseInt(attendance.dismissal),
     };
+    this.schedule = schedule || null;
   }
 }
 
-interface PartialCourseData {
-  courseName?: string;
-  courseElementId?: string;
-  courseCode?: string;
-  sectionNumber?: string;
-  semesters?: string;
-  teacherName?: string;
-  roomNumber?: string;
-  grade?: string;
-  attendance?: AttendanceChart;
-  schedule: object;
-}
-
-export class PartialCourse {
-  courseName?: string;
-  courseElementId?: string;
-  courseCode?: string;
-  sectionNumber?: string;
-  semesters?: string;
-  teacherName?: string;
-  roomNumber?: string;
-  grade?: string;
-  attendance?: AttendanceChart;
-  schedule: object;
-  
-  constructor(data: PartialCourseData) {
-    this.courseName = data.courseName;
-    this.courseElementId = data.courseElementId;
-    this.courseCode = data.courseCode;
-    this.sectionNumber = data.sectionNumber;
-    this.semesters = data.semesters;
-    this.teacherName = data.teacherName;
-    this.roomNumber = data.roomNumber;
-    this.grade = data.grade;
-    this.attendance = data.attendance;
-    this.schedule = data.schedule;
-  }
-}
+export type PartialCourse = Partial<Course>
