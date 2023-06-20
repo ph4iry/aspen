@@ -38,16 +38,41 @@ export default class Schedule {
      */
     loadCourses(courseLoad) {
         for (const course of courseLoad) {
+            console.log('name', course.courseName);
             const allBlocks = [this.M, this.T, this.W, this.R, this.F].flat(4);
             for (const day of [this.M, this.T, this.W, this.R, this.F]) {
-                day.forEach;
+                day.forEach(period => {
+                    period.map(block => {
+                        const corresponding = period.find(b => b.course.courseName === course.courseName && b.course.roomNumber === course.roomNumber);
+                        // if (corresponding) {
+                        //   corresponding.course = {
+                        //     ...course,
+                        //     ...corresponding.course,
+                        //     schedule: {
+                        //       ...corresponding.schedule
+                        //     }
+                        //   };
+                        // }
+                    });
+                    // period.forEach(block => {
+                    //   block.course = {
+                    //     ...course,
+                    //     ...block.course,
+                    //   };
+                    // });
+                });
+                // const correspondingBlocks = allBlocks.filter(block => {
+                //   return block.course.courseName === course.courseName && block.course.roomNumber && course.roomNumber;
+                // });
+                // console.log(correspondingBlocks.map(c => `${c.course.courseName}${c.course.roomNumber}`));
+                // correspondingBlocks.forEach(block => {
+                //   console.log(block.course.courseName, block.course.roomNumber);
+                //   block.course = {
+                //     ...course,
+                //     schedule: block.schedule,
+                //   };
+                // });
             }
-            const correspondingBlocks = allBlocks.filter(block => {
-                return block.course.courseName === course.courseName && block.course.roomNumber && course.roomNumber;
-            });
-            correspondingBlocks.forEach(block => {
-                block.course = Object.assign(Object.assign({}, course), { schedule: block.schedule });
-            });
         }
         return this;
     }

@@ -25,7 +25,7 @@ class Session {
     }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
-            this.browser = yield puppeteer.launch({ args: ['--no-sandbox'], headless: false });
+            this.browser = yield puppeteer.launch({ args: ['--no-sandbox'], headless: true });
             this.page = yield this.browser.newPage();
             yield this.page.goto('http://sis.mybps.org/aspen/logon.do');
         });
