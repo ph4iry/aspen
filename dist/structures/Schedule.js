@@ -7,12 +7,20 @@ export default class Schedule {
         this.F = schedule.F;
     }
     getDay(day) {
+        if (typeof day === 'number') {
+            day = ['M', 'T', 'W', 'R', 'F'][day];
+        }
         return this[day];
     }
     getPeriod(code) {
         const day = code[0], period = parseInt(code[1]);
         return this[day][period];
     }
+    /**
+     *
+     * @param period
+     * @returns The time of which the period ends
+     */
     getTimeOfPeriod(period) {
         switch (period) {
             case 1:
@@ -32,46 +40,22 @@ export default class Schedule {
         }
     }
     /**
-     * Populates the schedule with extra course data, such as section number.
+     * Populates the schedule with extra course data for each block, such as section number.
+     *
+     * NOTE: It is **strongly recommended** to use the **full year course load** with the { term: all } option when passing in a course load (ex. `Session.getCourses({ year: 'current', term: 'all' })`) to avoid partial courses being returned due to them being in a different term.
      * @param courseLoad An array of courses, usually obtained through `Session.getCourses()`
      * @returns a `Schedule` with populated courses
      */
     loadCourses(courseLoad) {
         for (const course of courseLoad) {
-            console.log('name', course.courseName);
-            const allBlocks = [this.M, this.T, this.W, this.R, this.F].flat(4);
             for (const day of [this.M, this.T, this.W, this.R, this.F]) {
                 day.forEach(period => {
-                    period.map(block => {
-                        const corresponding = period.find(b => b.course.courseName === course.courseName && b.course.roomNumber === course.roomNumber);
-                        // if (corresponding) {
-                        //   corresponding.course = {
-                        //     ...course,
-                        //     ...corresponding.course,
-                        //     schedule: {
-                        //       ...corresponding.schedule
-                        //     }
-                        //   };
-                        // }
+                    period.forEach(block => {
+                        if (block.course.courseName === course.courseName) {
+                            block.course = Object.assign(Object.assign(Object.assign({}, course), block.course), { schedule: Object.assign({}, block.schedule) });
+                        }
                     });
-                    // period.forEach(block => {
-                    //   block.course = {
-                    //     ...course,
-                    //     ...block.course,
-                    //   };
-                    // });
                 });
-                // const correspondingBlocks = allBlocks.filter(block => {
-                //   return block.course.courseName === course.courseName && block.course.roomNumber && course.roomNumber;
-                // });
-                // console.log(correspondingBlocks.map(c => `${c.course.courseName}${c.course.roomNumber}`));
-                // correspondingBlocks.forEach(block => {
-                //   console.log(block.course.courseName, block.course.roomNumber);
-                //   block.course = {
-                //     ...course,
-                //     schedule: block.schedule,
-                //   };
-                // });
             }
         }
         return this;

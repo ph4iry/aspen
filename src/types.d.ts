@@ -41,6 +41,9 @@ export interface UserData {
   sasid: string,
   grade: string,
   email: string,
+  schedule?: Schedule;
+  studentPhoto?: string;
+  gpa?: string;
 }
 
 export interface CourseData {
@@ -58,4 +61,33 @@ export interface CourseData {
     dismissal: string,
   },
   schedule?: object,
+}
+
+export namespace Schedules {
+  export namespace Nomenclature {
+    export type Day = 'M' | 'T' | 'W' | 'R' | 'F';
+    export type DayAsNumber = 0 | 1 | 2 | 3 | 4;
+
+    export type Period = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+    
+    export type Code = `${Day}${Period}`;
+  }
+
+  export interface Block {
+    schedule: ({
+      day: Schedules.Nomenclature.Day,
+      period: string,
+    })[],
+    course: Partial<Course>
+  }
+
+  export type Day = (Block)[][];
+
+  export interface Structure {
+    M: Day,
+    T: Day,
+    W: Day,
+    R: Day,
+    F: Day,
+  }
 }

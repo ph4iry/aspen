@@ -1,39 +1,15 @@
 import Course from './Course';
 
-export type MultiSemesterBlock = Block[];
-
-export type Day = (Block)[][];
-
-interface ScheduleData {
-  M: Day,
-  T: Day,
-  W: Day,
-  R: Day,
-  F: Day,
-}
-
-type ScheduleDay = 'M' | 'T' | 'W' | 'R' | 'F';
-
-type SchedulePeriod = 1 | 2 | 3 | 4 | 5 | 6 | 7;
-
-type ScheduleCode = `${ScheduleDay}${SchedulePeriod}`;
-
-export interface Block {
-  schedule: ({
-    day: ScheduleDay,
-    period: string,
-  })[],
-  course: Partial<Course>
-}
+import { Schedules } from '../types.js';
 
 export default class Schedule {
-  M: Day;
-  T: Day;
-  W: Day;
-  R: Day;
-  F: Day;
+  M: Schedules.Day;
+  T: Schedules.Day;
+  W: Schedules.Day;
+  R: Schedules.Day;
+  F: Schedules.Day;
 
-  constructor(schedule: ScheduleData) {
+  constructor(schedule: Schedules.Structure) {
     this.M = schedule.M;
     this.T = schedule.T;
     this.W = schedule.W;
@@ -41,17 +17,25 @@ export default class Schedule {
     this.F = schedule.F;
   }
 
-  getDay(day: ScheduleDay): Day {
+  getDay(day: (Schedules.Nomenclature.Day | Schedules.Nomenclature.DayAsNumber)): Schedules.Day {
+    if (typeof day === 'number') {
+      day = ['M', 'T', 'W', 'R', 'F'][day] as Schedules.Nomenclature.Day;
+    }
     return this[day];
   }
   
-  getPeriod(code: ScheduleCode) {
-    const day: ScheduleDay = code[0] as ScheduleDay,
-      period: SchedulePeriod = parseInt(code[1]) as SchedulePeriod;
+  getPeriod(code: Schedules.Nomenclature.Code) {
+    const day: Schedules.Nomenclature.Day = code[0] as Schedules.Nomenclature.Day,
+      period: Schedules.Nomenclature.Period = parseInt(code[1]) as Schedules.Nomenclature.Period;
     return this[day][period];
   }
 
-  getTimeOfPeriod(period: SchedulePeriod) {
+  /**
+   * 
+   * @param period
+   * @returns The time of which the period ends
+   */
+  getTimeOfPeriod(period: Schedules.Nomenclature.Period) {
     switch(period) {
     case 1:
       return '7:29 - 8:16';
@@ -71,49 +55,28 @@ export default class Schedule {
   }
 
   /**
-   * Populates the schedule with extra course data, such as section number.
+   * Populates the schedule with extra course data for each block, such as section number.
+   * 
+   * NOTE: It is **strongly recommended** to use the **full year course load** with the { term: all } option when passing in a course load (ex. `Session.getCourses({ year: 'current', term: 'all' })`) to avoid partial courses being returned due to them being in a different term.
    * @param courseLoad An array of courses, usually obtained through `Session.getCourses()`
    * @returns a `Schedule` with populated courses
    */
   loadCourses(courseLoad: Course[]) {
     for (const course of courseLoad) {
-      console.log('name', course.courseName);
-      const allBlocks = [this.M, this.T, this.W, this.R, this.F].flat(4);
       for (const day of [this.M, this.T, this.W, this.R, this.F]) {
         day.forEach(period => {
-          period.map(block => {
-            const corresponding = period.find(b => b.course.courseName === course.courseName && b.course.roomNumber === course.roomNumber);
-            // if (corresponding) {
-            //   corresponding.course = {
-            //     ...course,
-            //     ...corresponding.course,
-            //     schedule: {
-            //       ...corresponding.schedule
-            //     }
-            //   };
-            // }
+          period.forEach(block => {
+            if (block.course.courseName === course.courseName) {
+              block.course = {
+                ...course,
+                ...block.course,
+                schedule: {
+                  ...block.schedule
+                }
+              };
+            }
           });
-          // period.forEach(block => {
-          //   block.course = {
-          //     ...course,
-          //     ...block.course,
-          //   };
-          // });
         });
-
-        // const correspondingBlocks = allBlocks.filter(block => {
-        //   return block.course.courseName === course.courseName && block.course.roomNumber && course.roomNumber;
-        // });
-  
-        // console.log(correspondingBlocks.map(c => `${c.course.courseName}${c.course.roomNumber}`));
-  
-        // correspondingBlocks.forEach(block => {
-        //   console.log(block.course.courseName, block.course.roomNumber);
-        //   block.course = {
-        //     ...course,
-        //     schedule: block.schedule,
-        //   };
-        // });
       }
     }
     return this;

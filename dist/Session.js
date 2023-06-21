@@ -18,6 +18,7 @@ import ClientNotReadyError from './errors/ClientNotReady.js';
 import LoginFailedError from './errors/LoginFailed.js';
 import Course from './structures/Course.js';
 import Schedule from './structures/Schedule.js';
+import Student from './structures/Student.js';
 class Session {
     constructor() {
         _Session_instances.add(this);
@@ -70,7 +71,7 @@ class Session {
             });
             yield this.page.goto('http://sis.mybps.org/aspen/portalStudentDetail.do?navkey=myInfo.details.detail');
             yield this.page.waitForSelector('#mainTable');
-            return Object.assign(yield this.page.evaluate(() => {
+            return new Student(Object.assign(yield this.page.evaluate(() => {
                 var _b, _c, _d, _e, _f, _g, _h, _j;
                 const primary = {
                     studentId: (_b = document.querySelector('input[name="propertyValue(stdIDLocal)"]')) === null || _b === void 0 ? void 0 : _b.value,
@@ -89,7 +90,7 @@ class Session {
             }), {
                 gpa: _weightedGPA,
                 studentPhoto: _photo,
-            });
+            }));
         });
     }
     getClasses(options) {

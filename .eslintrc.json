@@ -34,7 +34,8 @@
         "always"
       ],
       "comma-dangle": ["error", "only-multiline"],
-      "@typescript-eslint/no-non-null-assertion": "off"
+      "@typescript-eslint/no-non-null-assertion": "off",
+      "@typescript-eslint/no-namespace": "off"
     }
   }
   

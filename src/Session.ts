@@ -2,8 +2,10 @@ import puppeteer, { Browser, Page } from 'puppeteer';
 import ClientNotReadyError from './errors/ClientNotReady.js';
 import LoginFailedError from './errors/LoginFailed.js';
 import Course from './structures/Course.js';
-import { CourseSearchOptions, terms, ClassDetailSearchMethod, Category } from './types.js';
-import Schedule, { Day } from './structures/Schedule.js';
+import { CourseSearchOptions, terms, ClassDetailSearchMethod, Category, Schedules } from './types.js';
+import Schedule from './structures/Schedule.js';
+import Student from './structures/Student.js';
+type Day = Schedules.Day;
 
 export default class Session {
   browser!: Browser;
@@ -56,7 +58,7 @@ export default class Session {
     }
   }
 
-  async getStudentInfo() {
+  async getStudentInfo(): Promise<Student> {
     this.#checkForClientReadiness();
     await this.page.goto('https://sis.mybps.org/aspen/gradePointSummary.do?navkey=myInfo.gradePoints.summary');
     await this.page.waitForSelector('#dataGrid');
@@ -80,7 +82,7 @@ export default class Session {
 
     await this.page.waitForSelector('#mainTable');
 
-    return Object.assign(await this.page.evaluate(() => {
+    return new Student(Object.assign(await this.page.evaluate(() => {
       const primary = {
         studentId: (document.querySelector('input[name="propertyValue(stdIDLocal)"]') as HTMLInputElement)?.value,
         // studentId: (table.querySelector('input[name="propertyValue(stdIDLocal)"]')).value,
@@ -99,10 +101,10 @@ export default class Session {
     }), {
       gpa: _weightedGPA,
       studentPhoto: _photo,
-    });
+    }));
   }
 
-  async getClasses (options: CourseSearchOptions) {
+  async getClasses (options: CourseSearchOptions): Promise<Course[]> {
     this.#checkForClientReadiness();
     await this.page.goto('http://sis.mybps.org/aspen/portalClassList.do?navkey=academics.classes.list');
     await this.page.waitForSelector('#dataGrid');
@@ -354,7 +356,7 @@ export default class Session {
     }, _course);
   }
 
-  async getSchedule() {
+  async getSchedule(): Promise<Schedule> {
     this.#checkForClientReadiness();
     await this.page.goto('https://sis.mybps.org/aspen/studentScheduleContextList.do?navkey=myInfo.sch.list&forceRedirect=false');
     await this.page.waitForSelector('#dataGrid > table');
