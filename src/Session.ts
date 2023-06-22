@@ -1,6 +1,6 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
-import ClientNotReadyError from './errors/ClientNotReady.js';
-import LoginFailedError from './errors/LoginFailed.js';
+import ClientNotReadyError from './structures/errors/ClientNotReady.js';
+import LoginFailedError from './structures/errors/LoginFailed.js';
 import Course from './structures/Course.js';
 import { CourseSearchOptions, terms, ClassDetailSearchMethod, Category, Schedules } from './types.js';
 import Schedule from './structures/Schedule.js';
@@ -28,7 +28,7 @@ export default class Session {
     this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: true });
     this.page = await this.browser.newPage();
 
-    await this.page.goto('http://sis.mybps.org/aspen/logon.do');
+    await this.page.goto('https://sis.mybps.org/aspen/logon.do');
   }
 
   async login(id: string, password: string) {
@@ -69,7 +69,7 @@ export default class Session {
     });
     
     
-    await this.page.goto('http://sis.mybps.org/aspen/portalStudentDetail.do?navkey=myInfo.details.detail');
+    await this.page.goto('https://sis.mybps.org/aspen/portalStudentDetail.do?navkey=myInfo.details.detail');
 
     await this.page.click('#contentArea > table:nth-child(2) > tbody > tr:nth-child(1) > td.contentContainer > table:nth-child(7) > tbody > tr:nth-child(3) > td > table > tbody > tr > td:nth-child(2) > a')
       .then(async () => await this.page.waitForSelector('#propertyValue\\(relStdPsnOid_psnPhoOIDPrim\\)-span > img'));
@@ -78,7 +78,7 @@ export default class Session {
       return (document.querySelector('#propertyValue\\(relStdPsnOid_psnPhoOIDPrim\\)-span > img') as HTMLImageElement).src;
     });
 
-    await this.page.goto('http://sis.mybps.org/aspen/portalStudentDetail.do?navkey=myInfo.details.detail');
+    await this.page.goto('https://sis.mybps.org/aspen/portalStudentDetail.do?navkey=myInfo.details.detail');
 
     await this.page.waitForSelector('#mainTable');
 
@@ -106,7 +106,7 @@ export default class Session {
 
   async getClasses (options: CourseSearchOptions): Promise<Course[]> {
     this.#checkForClientReadiness();
-    await this.page.goto('http://sis.mybps.org/aspen/portalClassList.do?navkey=academics.classes.list');
+    await this.page.goto('https://sis.mybps.org/aspen/portalClassList.do?navkey=academics.classes.list');
     await this.page.waitForSelector('#dataGrid');
 
     // selects year to view
