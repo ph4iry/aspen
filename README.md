@@ -1,5 +1,5 @@
 <div align="center">
-  <p style=""><img src="https://i.ibb.co/kMyj50d/banner.png" alt="banner" border="0"></p>
+  <p style=""><img src="https://imagetolink.com/ib/ix2BWTFVBk.png" alt="banner" border="0"></p>
 </div>
 
 # Aspen-SIS (Boston Public Schools)
@@ -39,7 +39,7 @@ For this example, user credentials are passed in from a `.env` file. However, th
 ```js
 import 'dotenv/config.js';
 
-import Session from 'bps-aspen';
+import { Session } from 'bps-aspen/dist';
 
 (async function () {
   const aspen = new Session();

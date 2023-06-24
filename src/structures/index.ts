@@ -1,3 +1,5 @@
-export * from './Course.js';
-export * from './Schedule.js';
-export * from './Student.js';
+import Course from './Course.js';
+import Student from './Student.js';
+import Schedule from './Schedule.js';
+
+export default {Course, Student, Schedule};

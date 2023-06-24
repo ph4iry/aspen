@@ -1,3 +1,6 @@
-export * from './structures/index.js';
-export * from './Session.js';
-// export * from './structures/index.js';
+import Structures from './structures/index.js';
+import Session from './Session.js';
+
+export default Session;
+
+export {Structures};
