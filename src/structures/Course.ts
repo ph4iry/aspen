@@ -21,6 +21,8 @@ export default class Course {
   grade: string | null;
   attendance: AttendanceChart;
   schedule: object | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  categories?: any[];
 
   constructor(data: CourseData) {
     const { courseName, courseCode, courseElementId, sectionNumber, semesters, teacherName, roomNumber, grade, attendance, schedule } = data;

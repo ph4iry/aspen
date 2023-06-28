@@ -5,16 +5,25 @@ import Course from './structures/Course.js';
 import { CourseSearchOptions, terms, ClassDetailSearchMethod, Category, Schedules } from './types.js';
 import Schedule from './structures/Schedule.js';
 import Student from './structures/Student.js';
+import { Assessments } from './structures/Assessments.js';
 type Day = Schedules.Day;
+
+interface SessionCache {
+  courses?: Course[];
+  schedule?: Schedule;
+  profile?: Student;
+  assessments?: Assessments.MajorAssessment[];
+}
 
 export default class Session {
   browser!: Browser;
   page!: Page;
   loggedIn: boolean;
-  courses?: Course[];
+  cache: SessionCache;
 
   constructor() {
     this.loggedIn = false;
+    this.cache = {};
   }
 
   static #markingPeriods = new Map()
@@ -25,7 +34,7 @@ export default class Session {
     .set('all', 'all');
 
   async init() {
-    this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: true });
+    this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: false });
     this.page = await this.browser.newPage();
 
     await this.page.goto('https://sis.mybps.org/aspen/logon.do');
@@ -82,7 +91,7 @@ export default class Session {
 
     await this.page.waitForSelector('#mainTable');
 
-    return new Student(Object.assign(await this.page.evaluate(() => {
+    const profile = new Student(Object.assign(await this.page.evaluate(() => {
       const primary = {
         studentId: (document.querySelector('input[name="propertyValue(stdIDLocal)"]') as HTMLInputElement)?.value,
         // studentId: (table.querySelector('input[name="propertyValue(stdIDLocal)"]')).value,
@@ -102,6 +111,10 @@ export default class Session {
       gpa: _weightedGPA,
       studentPhoto: _photo,
     }));
+
+    this.cache.profile = profile;
+
+    return profile;
   }
 
   async getClasses (options: CourseSearchOptions): Promise<Course[]> {
@@ -117,7 +130,7 @@ export default class Session {
     await this.page.select('select[name="termFilter"]', Session.#markingPeriods.get(options.term));
     await this.page.waitForSelector('#dataGrid');
 
-    this.courses = await this.page.evaluate(() => {
+    this.cache.courses = await this.page.evaluate(() => {
       const _rows = document.querySelectorAll('#dataGrid tr');
       const classes: (string[])[] = [];
       _rows.forEach(_row => {
@@ -154,12 +167,12 @@ export default class Session {
       });
     });
 
-    return this.courses;
+    return this.cache.courses;
   }
 
   async getClassDetailsByElementId(id: string, options?: CourseSearchOptions) {
-    const _classes = await this.getClasses({ year: (options?.year || 'current'), term: (options?.term || 'all') });
-    const _course = _classes.find(c => c.courseElementId === id);
+    const _classes = this.cache.courses || await this.getClasses({ year: (options?.year || 'current'), term: (options?.term || 'all') });
+    let _course = _classes.find(c => c.courseElementId === id);
 
     if (!_course) return null;
 
@@ -225,13 +238,15 @@ export default class Session {
       };
     }, _propertySelectors);
 
-    return Object.assign(_course, _classDetails);
+    _course = Object.assign(_course, _classDetails);
+    return _course;
+
   }
 
   async getClassDetails(method: ClassDetailSearchMethod, searchValue: string, options?: CourseSearchOptions) {
-    const _classes = await this.getClasses({ year: (options?.year || 'current'), term: (options?.term || 'all')});
+    const _classes = this.cache.courses || await this.getClasses({ year: (options?.year || 'current'), term: (options?.term || 'all')});
 
-    const _course = _classes.find(course => {
+    let _course = _classes.find(course => {
       // returns a falsy value (0) if it doesnt come up, and indices will be 1+ (therefore truthy)
       return course[method].toLowerCase().indexOf(searchValue.toLowerCase()) + 1;
     });
@@ -302,7 +317,8 @@ export default class Session {
       };
     }, _propertySelectors);
 
-    return Object.assign(_course, _classDetails);
+    _course = Object.assign(_course, _classDetails);
+    return _course;
   }
 
   async getAssignments(
@@ -339,7 +355,7 @@ export default class Session {
           
           return {
             assignmentName: _cols[1],
-            category: _course?.categories.find((_category) => _category.name === _cols[2]),
+            category: _course?.categories!.find((_category) => _category.name === _cols[2]),
             dateAssigned: _cols[3],
             dateDue: _cols[4],
             score: {
@@ -412,8 +428,86 @@ export default class Session {
       
       return structure;
     })();
-    return new Schedule(fullSchedule);
+    const schedule = new Schedule(fullSchedule);
+
+    this.cache.schedule = schedule;
+    return schedule;
   }
+
+  /**
+   * 
+   * @returns A number from 0-100 representing the percentage of progress made towards graduation.
+   */
+  async getGraduationProgress(): Promise<number> {
+    this.#checkForClientReadiness();
+    await this.page.goto('https://sis.mybps.org/aspen/transcriptList.do?navkey=myInfo.trn.list');
+    await this.page.waitForSelector('#layoutVerticalTabs > table > tbody > tr:nth-child(2) > td > div:nth-child(10) > a');
+
+    await Promise.all([
+      this.page.waitForNavigation({ waitUntil: 'networkidle2' }),
+      this.page.click('#layoutVerticalTabs > table > tbody > tr:nth-child(2) > td > div:nth-child(10) > a'),
+    ]);
+    
+    await Promise.all([
+      this.page.waitForNavigation({ waitUntil: 'networkidle2' }),
+      this.page.select('#selectedProgramStudiesOid', 'GPR000001wUaN6'),
+    ]);
+
+    return await this.page.evaluate(() => {
+      const mainTable = document.querySelector('#contentArea > table:nth-child(2) > tbody > tr:nth-child(1) > td.contentContainer > table:nth-child(4) > tbody > tr:nth-child(7) > td > table > tbody > tr > td > div > table > tbody');
+      // const 
+      const lastRow = mainTable!.querySelector('#contentArea > table:nth-child(2) > tbody > tr:nth-child(1) > td.contentContainer > table:nth-child(4) > tbody > tr:nth-child(7) > td > table > tbody > tr > td > div > table > tbody > tr:nth-child(10)');
+      return parseInt((lastRow?.querySelector('th:last-child') as HTMLTableCellElement).innerText);
+    });
+    // await this.page.evaluate(() => {
+    //   (document.querySelector('#layoutVerticalTabs > table > tbody > tr:nth-child(2) > td > div:nth-child(10) > a') as HTMLAnchorElement).click();
+    // }).then(() => this.page.waitForNavigation());
+  }
+
+  async getAssessments() {
+    this.#checkForClientReadiness();
+    await this.page.goto('https://sis.mybps.org/aspen/assessmentList.do?navkey=myInfo.asm.list');
+    await this.page.waitForSelector('#dataGrid > table > tbody');
+
+    const assessments = await this.page.evaluate(() => {
+      const _rows = Array.from(document.querySelector('#dataGrid > table > tbody')!.querySelectorAll('tr'));
+      _rows.shift();
+      return _rows.map(tr => {
+        const cells = Array.from(tr.querySelectorAll('td'));
+        cells.shift();
+
+        return cells;
+      }).map(cells => {
+        const ASSESSMENT_DATA = cells.map(c => c.innerText);
+        return {
+          name: ASSESSMENT_DATA[1],
+          schoolYear: ASSESSMENT_DATA[0],
+          rawScore: parseFloat(ASSESSMENT_DATA[2]),
+          scaleScore: parseFloat(ASSESSMENT_DATA[3]),
+          performanceLevel: ASSESSMENT_DATA[4],
+        };
+      });
+    });
+
+    const result = assessments.map(test => {
+      // add support for more unique exams & test details such as subject for mcas tests
+      switch(test.name) {
+      case 'MCAS':
+        return new Assessments.MCAS({
+          ...test,
+          performanceLevel: test.performanceLevel as 'NM' | 'PM' | 'M' | 'E' | 'P' | 'A' | 'NI' | 'F',
+        });
+      default:
+        return new Assessments.MajorAssessment(test);
+      }
+    });
+
+    this.cache.assessments = result;
+  }
+
+  // async getCourseRequests(table: 'build-yr' | 'current-yr') {
+
+  // }
 
   async exit() {
     this.browser.close();
