@@ -34,7 +34,7 @@ export default class Session {
     .set('all', 'all');
 
   async init() {
-    this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: false });
+    this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: true });
     this.page = await this.browser.newPage();
 
     await this.page.goto('https://sis.mybps.org/aspen/logon.do');
