@@ -1,25 +1,19 @@
-<div align="center">
-  <p style=""><img src="https://imagetolink.com/ib/ix2BWTFVBk.png" alt="banner" border="0"></p>
-</div>
-
 # Aspen-SIS (Boston Latin Academy)
 > An API library to interact with the [Boston Latin Academy's (in Boston Public Schools) version of Aspen (SIS) by Follett](https://sis.mybps.org/aspen/)
 
 ## ⚠️ Note
 > The package uses [Puppeteer](https://github.com/puppeteer/puppeteer/tree/main) (and a version of Chromium with Puppeteer) to fetch the data. Due to web restrictions, this package should only be used on the server side of applications.
 
-> Additionally, some of the built-in `Session` functions (such as schedules) are not a one-size-fits-all for BPS students. Due to this, it has been designed with the **7-period 5-day schedule at Boston Latin Academy.**
-
 ## ⬇️ Installation
 Install the package on NPM using the package manager of your choice:
 ```bash
-npm install bps-aspen
+npm install bla-aspen
 ```
 ```bash
-yarn add bps-aspen
+yarn add bla-aspen
 ```
 ```bash
-pnpm add bps-aspen
+pnpm add bla-aspen
 ```
 
 ## 🛠️ Usage
