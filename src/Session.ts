@@ -1,27 +1,32 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
-import ClientNotReadyError from './structures/errors/ClientNotReady.js';
-import LoginFailedError from './structures/errors/LoginFailed.js';
-import Course from './structures/Course.js';
-import { CourseSearchOptions, terms, ClassDetailSearchMethod, Category, Schedules } from './types.js';
-import Schedule from './structures/Schedule.js';
-import Student from './structures/Student.js';
-import { Assessments } from './structures/Assessments.js';
-type Day = Schedules.Day;
+import pTypes from 'puppeteer';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import Structures from './structures.js';
+
+type Day = Structures.ScheduleClassifiers.Day;
 
 interface SessionCache {
-  courses?: Course[];
-  schedule?: Schedule;
-  profile?: Student;
-  assessments?: Assessments.MajorAssessment[];
+  courses?: Structures.Course[];
+  schedule?: Structures.Schedule;
+  profile?: Structures.Student;
+  assessments?: Structures.MajorAssessment[];
 }
 
 export default class Session {
-  browser!: Browser;
-  page!: Page;
+  username: string;
+  pass: string;
+  browser!: pTypes.Browser;
+  page!: pTypes.Page;
   loggedIn: boolean;
   cache: SessionCache;
 
-  constructor() {
+  constructor(email: string, password: string) {
+    if(email.toLowerCase().includes('@bostonk12.org')) {
+      this.username = email.substring(0, email.indexOf('@bostonk12.org'));
+    } else {
+      this.username = email;
+    }
+    this.pass = password;
     this.loggedIn = false;
     this.cache = {};
   }
@@ -34,41 +39,38 @@ export default class Session {
     .set('all', 'all');
 
   async init() {
-    this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: false });
+    puppeteer.use(StealthPlugin());
+
+    this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: true });
     this.page = await this.browser.newPage();
+    await this.page.setViewport({ width: 800, height: 600 });
 
     await this.page.goto('https://sis.mybps.org/aspen/logon.do');
-  }
+    await this.page.click('#ssoButton');
+    await this.page.waitForNavigation();
+    await this.page.type('input[type="email"]', `${this.username}@bostonk12.org`);
+    await this.page.click('div[id="identifierNext"]');
+    await this.page.waitForTimeout(2000); // Wait for the password field to appear
+    await this.page.type('input[type="password"]', this.pass);
+    await this.page.click('div[id="passwordNext"]');
+    await this.page.waitForNavigation({ waitUntil: 'networkidle2' }).then(() => {
+      this.loggedIn = true;
+    });
 
-  async login(id: string, password: string) {
-    await this.init();
-    await this.page.type('input#username', id);
-    await this.page.type('input#password', password);
-    await this.page.evaluate(() => (<HTMLButtonElement>document.querySelector('#logonButton')).click())
-      .then(() => this.page!.waitForNavigation({ waitUntil: 'networkidle2' }))
-      .then(async () => {
-        const text = await this.page.$('#messageWindow > table > tbody > tr:nth-child(3) > td:nth-child(2) > div');
-        if (text) {
-          throw new LoginFailedError();
-        } else {
-          this.loggedIn = true;
-        }
-      })
-      .catch(() => {
-        return 401;
-      });
-    
     return this;
   }
 
-  #checkForClientReadiness() {
+  private checkValidity(): void | never {
     if (!this.loggedIn) {
-      throw new ClientNotReadyError('Try logging in first, then getting information.');
+      throw new Error('Not logged in');
+    }
+    if (!this.page) {
+      this.init();
     }
   }
 
-  async getStudentInfo(): Promise<Student> {
-    this.#checkForClientReadiness();
+  async getStudentInfo(): Promise<Structures.Student> {
+    // this.checkValidity();
     await this.page.goto('https://sis.mybps.org/aspen/gradePointSummary.do?navkey=myInfo.gradePoints.summary');
     await this.page.waitForSelector('#dataGrid');
 
@@ -91,7 +93,7 @@ export default class Session {
 
     await this.page.waitForSelector('#mainTable');
 
-    const profile = new Student(Object.assign(await this.page.evaluate(() => {
+    const profile = new Structures.Student(Object.assign(await this.page.evaluate(() => {
       const primary = {
         studentId: (document.querySelector('input[name="propertyValue(stdIDLocal)"]') as HTMLInputElement)?.value,
         // studentId: (table.querySelector('input[name="propertyValue(stdIDLocal)"]')).value,
@@ -117,8 +119,8 @@ export default class Session {
     return profile;
   }
 
-  async getClasses (options: CourseSearchOptions): Promise<Course[]> {
-    this.#checkForClientReadiness();
+  async getClasses (options: Structures.CourseSearchOptions): Promise<Structures.Course[]> {
+    this.checkValidity();
     await this.page.goto('https://sis.mybps.org/aspen/portalClassList.do?navkey=academics.classes.list');
     await this.page.waitForSelector('#dataGrid');
 
@@ -149,7 +151,7 @@ export default class Session {
     }).then(classes => {
       classes.shift();
       return classes.map((course) => {
-        return new Course({
+        return new Structures.Course({
           courseName: course[1],
           courseElementId: course[0],
           courseCode: course[2].split('-')[0],
@@ -170,7 +172,7 @@ export default class Session {
     return this.cache.courses;
   }
 
-  async getClassDetailsByElementId(id: string, options?: CourseSearchOptions) {
+  async getClassDetailsByElementId(id: string, options?: Structures.CourseSearchOptions) {
     const _classes = this.cache.courses || await this.getClasses({ year: (options?.year || 'current'), term: (options?.term || 'all') });
     let _course = _classes.find(c => c.courseElementId === id);
 
@@ -189,7 +191,7 @@ export default class Session {
     };
 
     const _classDetails = await this.page.evaluate((_properties) => {
-      const _categories: Category[] = [].slice
+      const _categories: Structures.GradingCategory[] = [].slice
         .call(document.querySelectorAll('#dataGridRight > table > tbody > tr > td[rowspan]'))
         .map((_category: HTMLTableCellElement) => {
           const _categoryName = _category.innerText;
@@ -243,7 +245,7 @@ export default class Session {
 
   }
 
-  async getClassDetails(method: ClassDetailSearchMethod, searchValue: string, options?: CourseSearchOptions) {
+  async getClassDetails(method: Structures.ClassDetailSearchMethod, searchValue: string, options?: Structures.CourseSearchOptions) {
     const _classes = this.cache.courses || await this.getClasses({ year: (options?.year || 'current'), term: (options?.term || 'all')});
 
     let _course = _classes.find(course => {
@@ -268,7 +270,7 @@ export default class Session {
     };
 
     const _classDetails = await this.page.evaluate((_properties) => {
-      const _categories: Category[] = [].slice
+      const _categories: Structures.GradingCategory[] = [].slice
         .call(document.querySelectorAll('#dataGridRight > table > tbody > tr > td[rowspan]'))
         .map((_category: HTMLTableCellElement) => {
           const _categoryName = _category.innerText;
@@ -323,12 +325,12 @@ export default class Session {
 
   async getAssignments(
     course: {
-      method: ClassDetailSearchMethod,
+      method: Structures.ClassDetailSearchMethod,
       search: string,
-      options?: CourseSearchOptions
+      options?: Structures.CourseSearchOptions
     },
     assignmentFilter: {
-      term: terms
+      term: Structures.MarkingTerms
     },
   ){
     const { method, search, options } = course;
@@ -372,8 +374,8 @@ export default class Session {
     }, _course);
   }
 
-  async getSchedule(): Promise<Schedule> {
-    this.#checkForClientReadiness();
+  async getSchedule(): Promise<Structures.Schedule> {
+    this.checkValidity();
     await this.page.goto('https://sis.mybps.org/aspen/studentScheduleContextList.do?navkey=myInfo.sch.list&forceRedirect=false');
     await this.page.waitForSelector('#dataGrid > table');
     const result = await this.page.evaluate(() => {
@@ -428,7 +430,7 @@ export default class Session {
       
       return structure;
     })();
-    const schedule = new Schedule(fullSchedule);
+    const schedule = new Structures.Schedule(fullSchedule);
 
     this.cache.schedule = schedule;
     return schedule;
@@ -439,7 +441,7 @@ export default class Session {
    * @returns A number from 0-100 representing the percentage of progress made towards graduation.
    */
   async getGraduationProgress(): Promise<number> {
-    this.#checkForClientReadiness();
+    this.checkValidity();
     await this.page.goto('https://sis.mybps.org/aspen/transcriptList.do?navkey=myInfo.trn.list');
     await this.page.waitForSelector('#layoutVerticalTabs > table > tbody > tr:nth-child(2) > td > div:nth-child(10) > a');
 
@@ -465,7 +467,7 @@ export default class Session {
   }
 
   async getAssessments() {
-    this.#checkForClientReadiness();
+    this.checkValidity();
     await this.page.goto('https://sis.mybps.org/aspen/assessmentList.do?navkey=myInfo.asm.list');
     await this.page.waitForSelector('#dataGrid > table > tbody');
 
@@ -493,12 +495,12 @@ export default class Session {
       // add support for more unique exams & test details such as subject for mcas tests
       switch(test.name) {
       case 'MCAS':
-        return new Assessments.MCAS({
+        return new Structures.MCAS({
           ...test,
           performanceLevel: test.performanceLevel as 'NM' | 'PM' | 'M' | 'E' | 'P' | 'A' | 'NI' | 'F',
         });
       default:
-        return new Assessments.MajorAssessment(test);
+        return new Structures.MajorAssessment(test);
       }
     });
 

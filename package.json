@@ -1,7 +1,7 @@
 {
-  "name": "bps-aspen",
-  "version": "1.0.2",
-  "description": "An API library to interact with the Boston Public Schools version of Aspen (SIS) by Follett",
+  "name": "bla-aspen",
+  "version": "1.0.1",
+  "description": "An API library to interact with Boston Latin Academy's (in Boston Public Schools) version of Aspen (SIS) by Follett",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -38,7 +38,10 @@
     "url": "git+https://github.com/ph4iry/aspen.git"
   },
   "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
     "dotenv": "^16.0.3",
-    "puppeteer": "^18.0.0"
+    "puppeteer": "^18.2.1",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   }
 }
