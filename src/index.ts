@@ -1,4 +1,7 @@
-// import Structures from './structures/structures.js';
-import Session from './Session.js';
+import { Session } from './Session.js';
+import Structures from './structures.js';
 
-export default Session;
+export default {
+  Session,
+  Structures
+};

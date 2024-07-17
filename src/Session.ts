@@ -1,9 +1,9 @@
 import pTypes from 'puppeteer';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import Structures from './structures.js';
+import Structures from './structures';
 
-type Day = Structures.ScheduleClassifiers.Day;
+// type Day = Structures.ScheduleClassifiers.Day;
 
 interface SessionCache {
   courses?: Structures.Course[];
@@ -12,7 +12,7 @@ interface SessionCache {
   assessments?: Structures.MajorAssessment[];
 }
 
-export default class Session {
+export class Session {
   username: string;
   pass: string;
   browser!: pTypes.Browser;
@@ -69,7 +69,8 @@ export default class Session {
     }
   }
 
-  async getStudentInfo(): Promise<Structures.Student> {
+  async getStudentInfo(useCache = true): Promise<Structures.Student> {
+    if (this.cache.profile && useCache) return this.cache.profile;
     // this.checkValidity();
     await this.page.goto('https://sis.mybps.org/aspen/gradePointSummary.do?navkey=myInfo.gradePoints.summary');
     await this.page.waitForSelector('#dataGrid');
@@ -120,6 +121,7 @@ export default class Session {
   }
 
   async getClasses (options: Structures.CourseSearchOptions): Promise<Structures.Course[]> {
+    if (this.cache.courses && options.useCache) return this.cache.courses;
     this.checkValidity();
     await this.page.goto('https://sis.mybps.org/aspen/portalClassList.do?navkey=academics.classes.list');
     await this.page.waitForSelector('#dataGrid');
@@ -161,9 +163,9 @@ export default class Session {
           roomNumber: course[5],
           grade: (course.length === 9 ? null : course[6]),
           attendance: {
-            absences: (course[(course.length === 9 ? 6 : 7)]),
-            tardy: (course[(course.length === 9 ? 7 : 8)]),
-            dismissal: (course[(course.length === 9 ? 8 : 9)]),
+            absences: (course[(course.length === 9 ? 6 : 7)]) as `${number}`,
+            tardy: (course[(course.length === 9 ? 7 : 8)]) as `${number}`,
+            dismissal: (course[(course.length === 9 ? 8 : 9)]) as `${number}`,
           },
         });
       });
@@ -332,7 +334,7 @@ export default class Session {
     assignmentFilter: {
       term: Structures.MarkingTerms
     },
-  ){
+  ) {
     const { method, search, options } = course;
     const _course = await this.getClassDetails(method, search, options);
     
@@ -374,65 +376,148 @@ export default class Session {
     }, _course);
   }
 
-  async getSchedule(): Promise<Structures.Schedule> {
+  async getSchedule(useCache = true) { // : Promise<Structures.Schedule> {
+    if (this.cache.schedule && useCache) return this.cache.schedule;
+
     this.checkValidity();
     await this.page.goto('https://sis.mybps.org/aspen/studentScheduleContextList.do?navkey=myInfo.sch.list&forceRedirect=false');
-    await this.page.waitForSelector('#dataGrid > table');
-    const result = await this.page.evaluate(() => {
-      const schedule: string[][] = [];
-      const rows = document.querySelectorAll('#dataGrid > table > tbody > tr.listCell');
-      console.log(rows);
-      rows.forEach(course => {
-        const list: string[] = [];
-        Array.from(course.getElementsByTagName('td')).forEach(col => {
-          list.push(col.innerText);
-        });
-        schedule.push(list.slice(2));
-      });
-      return schedule;
-    });
+    await this.page.waitForSelector('.listGridFixed > table table > tbody > tr');
+
+    const ScheduleStructure = Structures.Schedule;
+    const Course = Structures.Course;
     
-    const scheduleByClass = result.map((course: string[]) => {
-      const schedule = course[2].trim().split(' ').map(day => {
-        const periodRegex = /\(([^)]+)\)/;
-        const dayRegex = /^([a-zA-Z])\(.*\)$/;
-        return {
-          day: (day.match(dayRegex)?.toString().split(',')[1] as ('M' | 'T' | 'W' | 'R' | 'F')),
-          period: (day.match(periodRegex)?.toString().split(',')[1] as (string)),
-        };
-      });
-      return {
-        schedule: schedule,
-        course: {
-          courseName: course[0],
-          semesters: course[1],
-          roomNumber: course[3],
-          teacherName: course[4],
+    const schedule = await this.page.evaluate((stringifiedScheduleStructure, stringifiedCourseDefinition, courseCache) => {
+      eval('window.ScheduleStructure = ' + stringifiedScheduleStructure);
+      eval('window.Course = ' + stringifiedCourseDefinition);
+      // each row (including number... idk)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      function rowToColumnMajor(matrix: any[][]): any[][] {
+        const numRows = matrix.length;
+        const numCols = matrix[0].length;
+    
+        // Create a new matrix with switched dimensions
+        const columnMajorMatrix = Array.from({ length: numCols }, () => Array(numRows).fill(null));
+    
+        // Populate the new matrix
+        for (let i = 0; i < numRows; i++) {
+          for (let j = 0; j < numCols; j++) {
+            columnMajorMatrix[j][i] = matrix[i][j];
+          }
         }
-      };
-    });
+    
+        return columnMajorMatrix;
+      }
 
-    const fullSchedule = (() => {
-      const structure: {  M: Day, T: Day, W: Day, R: Day, F: Day } = {
-        M: [[], [], [], [], [], [], []],
-        T: [[], [], [], [], [], [], []],
-        W: [[], [], [], [], [], [], []],
-        R: [[], [], [], [], [], [], []],
-        F: [[], [], [], [], [], [], []],
-      };
-
-      scheduleByClass.flat().forEach(course => {
-        if (!course.schedule[0].day) return;
-        for (const meeting of course.schedule) {
-          structure[meeting.day][parseInt(meeting.period) - 1].push(course);
-        }
-      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      function isRectangular(matrix: any[][]): boolean {
+        if (matrix.length === 0) return false; // An empty matrix is not considered rectangular
       
-      return structure;
-    })();
-    const schedule = new Structures.Schedule(fullSchedule);
+        const rowLength = matrix[0].length;
+        for (let i = 1; i < matrix.length; i++) {
+          if (matrix[i].length !== rowLength) {
+            return false; // Found a row with a different length
+          }
+        }
+        return true; // All rows have the same length
+      }
 
-    this.cache.schedule = schedule;
+      const rows = (Array.from(document.querySelectorAll('.listGridFixed > table:nth-child(1) > tbody:nth-child(1) > tr:nth-child(1) > td:nth-child(1) > table:nth-child(1) > tbody:nth-child(1) > tr:not(.listHeader)')) as HTMLTableRowElement[])
+        .map(row => {
+          const res: HTMLTableCellElement[] = Array.from(row?.querySelectorAll(':scope > td'));
+          return res;
+        });
+
+      if (!isRectangular(rows)) {
+        rows.map((tableRow: HTMLTableCellElement[], rowNumber: number) => {
+          tableRow.forEach((cell, columnNumber) => {
+            if (cell.rowSpan > 1) {
+              cell.setAttribute('rowspan', '1');
+              rows[rowNumber + 1].splice(columnNumber, 0, cell);
+            }
+          });
+          return tableRow;
+        });
+      }
+
+      // console.log('did i fix it??', isRectangular(rows));
+      
+      const tableByColumns: HTMLTableCellElement[][] = rowToColumnMajor(rows);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const scheduleAsCourseCollection: any[][] = tableByColumns.map(c => c.map(cell => {
+        const dataToFormat = cell.innerText.split('\n');
+        const [courseCode, sectionNumber] = dataToFormat[0].split('-');
+        const courseName = dataToFormat[1];
+        const teacherName = dataToFormat[2];
+        const roomNumber = dataToFormat[3];
+        const semesters = dataToFormat[4];
+
+        console.log(courseCode, sectionNumber, courseName, teacherName, roomNumber, semesters);
+
+        return {
+          ...(courseCache?.find(c => c.courseCode === courseCode && c.sectionNumber === sectionNumber)),
+          courseName,
+          teacherName,
+          roomNumber,
+          courseCode,
+          sectionNumber,
+          semesters,
+          schedule: null,
+          grade: null,
+          attendance: null,
+        };
+      }));
+
+      scheduleAsCourseCollection.shift();
+
+      console.log(scheduleAsCourseCollection);
+
+      // assign indivdual schedules to courses
+      const courses: { [room: string]: ({
+        day: 'M' | 'T' | 'W' | 'R' | 'F',
+        period: string,
+      })[] } = {};
+
+      scheduleAsCourseCollection.forEach((day, dayOfWeekAsNumber) => {
+        const daysOfWeek = ['M', 'T', 'W', 'R', 'F'];
+        day.forEach((course, period) => {
+          if (!courses[`${course.courseCode}-${course.sectionNumber}`]) {
+            courses[`${course.courseCode}-${course.sectionNumber}`] = [];
+          }
+
+          console.log(dayOfWeekAsNumber, period + 1);
+
+          courses[`${course.courseCode}-${course.sectionNumber}`].push({
+            day: daysOfWeek[dayOfWeekAsNumber] as Structures.ScheduleClassifiers.Nomenclature.Day,
+            period: (period + 1).toString(),
+          });
+        });
+      });
+
+      console.log(courses);
+
+      const finalStructure = scheduleAsCourseCollection
+        .map(d =>
+          d.map((col) => {
+            if (courses[`${col.courseCode}-${col.sectionNumber}`]) {
+              col.schedule = courses[`${col.courseCode}-${col.sectionNumber}`];
+            }
+            return {
+              course: col,
+              schedule: courses[`${col.courseCode}-${col.sectionNumber}`],
+            };
+          })
+        );
+      
+      return new ScheduleStructure({
+        M: finalStructure[0],
+        T: finalStructure[1],
+        W: finalStructure[2],
+        R: finalStructure[3],
+        F: finalStructure[4],
+      });
+    }, ScheduleStructure.toString(), Course.toString(), this.cache.courses);
+
     return schedule;
   }
 

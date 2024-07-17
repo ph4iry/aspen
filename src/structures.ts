@@ -61,9 +61,9 @@ namespace Structures {
    * An object representing the absences, tardies, and early dismissals from a given course.
    */
   export interface AttendanceChart {
-    absences: number,
-    tardy: number,
-    dismissal: number,
+    absences: `${number}`,
+    tardy: `${number}`,
+    dismissal: `${number}`,
   }
 
   /**
@@ -87,7 +87,7 @@ namespace Structures {
       course: Partial<Course>
     }
   
-    export type Day = (Block)[][];
+    export type Day = (Block)[];
   
     export interface BaseSchedule {
       M: Day,
@@ -164,17 +164,15 @@ namespace Structures {
       for (const course of courseLoad) {
         for (const day of [this.M, this.T, this.W, this.R, this.F]) {
           day.forEach(period => {
-            period.forEach(block => {
-              if (block.course.courseName === course.courseName) {
-                block.course = {
-                  ...course,
-                  ...block.course,
-                  schedule: {
-                    ...block.schedule
-                  }
-                };
-              }
-            });
+            if (period.course.courseName === course.courseName) {
+              period.course = {
+                ...course,
+                ...period.course,
+                schedule: {
+                  ...period.schedule
+                }
+              };
+            }
           });
         }
       }
@@ -190,6 +188,7 @@ namespace Structures {
   export interface CourseSearchOptions {
     year: 'current' | 'previous'
     term: MarkingTerms | 'all'
+    useCache?: boolean;
   }
 
   export type ClassDetailSearchMethod = 'courseName' | 'teacherName' | 'courseCode' | 'sectionNumber';
@@ -219,31 +218,27 @@ namespace Structures {
   export interface CourseData {
     courseName: string,
     courseCode: string,
-    courseElementId: string;
+    courseElementId?: string;
     sectionNumber: string,
     semesters: string,
     teacherName: string,
     roomNumber: string,
     grade: string | null,
-    attendance: {
-      absences: string,
-      tardy: string,
-      dismissal: string,
-    },
-    schedule?: object,
+    attendance: AttendanceChart | null,
+    schedule?: object | null,
   }
 
   export class Course {
     courseName: string;
-    courseElementId: string;
+    courseElementId?: string;
     courseCode: string;
     sectionNumber: string;
     semesters: string;
     teacherName: string;
     roomNumber: string;
     grade: string | null;
-    attendance: AttendanceChart;
-    schedule: object | null;
+    attendance: AttendanceChart | null;
+    schedule?: object | null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     categories?: any[];
   
@@ -257,10 +252,10 @@ namespace Structures {
       this.teacherName = teacherName;
       this.roomNumber = roomNumber;
       this.grade = grade;
-      this.attendance = {
-        absences: parseInt(attendance.absences),
-        tardy: parseInt(attendance.tardy),
-        dismissal: parseInt(attendance.dismissal),
+      this.attendance = attendance && {
+        absences: (attendance.absences),
+        tardy: (attendance.tardy),
+        dismissal: (attendance.dismissal),
       };
       this.schedule = schedule || null;
     }
