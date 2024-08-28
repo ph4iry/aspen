@@ -1,6 +1,6 @@
 {
   "name": "bla-aspen",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "An API library to interact with Boston Latin Academy's (in Boston Public Schools) version of Aspen (SIS) by Follett",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
