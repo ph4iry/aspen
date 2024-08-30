@@ -18,6 +18,7 @@
   },
   "compilerOptions": {
     "moduleResolution": "Node16",
+    "module": "Node16",
     "lib": ["DOM", "ESNext"],
     "outDir": "dist",
     "declaration": true,

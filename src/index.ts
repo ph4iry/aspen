@@ -43,24 +43,30 @@ export class Session {
     .set('q4', 'GTMp1000026Gdk')
     .set('all', 'all');
 
-  async init() {
+  async init(executablePath?: string) {
     puppeteer.use(StealthPlugin());
 
-    this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: true });
+    this.browser = await puppeteer.launch({ args: ['--no-sandbox'], headless: true, executablePath });
     this.page = await this.browser.newPage();
     await this.page.setViewport({ width: 800, height: 600 });
 
     await this.page.goto('https://sis.mybps.org/aspen/logon.do');
     await this.page.click('#ssoButton');
-    await this.page.waitForNavigation();
-    await this.page.type('input[type="email"]', `${this.username}@bostonk12.org`);
-    await this.page.click('div[id="identifierNext"]');
-    await this.page.waitForSelector('div[id="passwordNext"]');
-    await this.page.type('input[type="password"]', this.pass);
-    await this.page.click('div[id="passwordNext"]');
-    await this.page.waitForNavigation({ waitUntil: 'networkidle2' }).then(() => {
-      this.loggedIn = true;
-    });
+
+      
+    await this.page.waitForSelector('[type="email"]');
+    await this.page.type('[type="email"]', `${this.username}@bostonk12.org`);
+    await this.page.click('#identifierNext');
+
+    await this.page.waitForSelector('[type="password"]', { visible: true });
+    await this.page.type('[type="password"]', this.pass);
+
+    await Promise.all([
+      this.page.click('#passwordNext'),
+      this.page.waitForNavigation({ waitUntil: 'networkidle2' }).then(() => {
+        this.loggedIn = true;
+      }),
+    ]);
 
     return this;
   }
@@ -109,6 +115,7 @@ export class Session {
           id: (document.querySelector('input[name="propertyValue(relStdSklOid_sklSchoolID)"]') as HTMLInputElement)?.value,
           counselor: (document.querySelector('input[name="propertyValue(stdFieldB009)"]') as HTMLInputElement)?.value,
         },
+        locker: (document.querySelector('input[name="propertyValue(stdLocker)"]') as HTMLInputElement)?.value,
         sasid: (document.querySelector('input[name="propertyValue(stdIDState)"]') as HTMLInputElement)?.value,
         grade: (document.querySelector('input[name="propertyValue(stdGradeLevel)"]') as HTMLInputElement)?.value,
         email: (document.querySelector('input[name="propertyValue(relStdPsnOid_psnEmail01)"]') as HTMLInputElement)?.value,
@@ -272,7 +279,7 @@ export class Session {
       return null;
     }
 
-    Promise.all([
+    await Promise.all([
       this.page.waitForNavigation({ waitUntil: 'networkidle2' }),
       this.page.click(`#${_course?.courseElementId} > a`),
     ]);
@@ -633,6 +640,7 @@ export namespace Structures {
       id: string,
       counselor: string,
     },
+    locker: string,
     sasid: string,
     grade: string,
     email: string,
@@ -648,6 +656,7 @@ export namespace Structures {
     studentId: string;
     name: string;
     school: { name: string, id: string, counselor: string };
+    locker: string;
     sasid: string;
     grade: number;
     email: string;
@@ -656,7 +665,7 @@ export namespace Structures {
     gpa?: string;
   
     constructor(data: UserData) {
-      const { studentId, name, school, sasid, grade, email, gpa, studentPhoto } = data;
+      const { studentId, name, school, locker, sasid, grade, email, gpa, studentPhoto } = data;
       this.studentId = studentId;
       this.name = name;
       this.school = school;
@@ -665,6 +674,7 @@ export namespace Structures {
       this.email = email;
       this.gpa = gpa;
       this.studentPhoto = studentPhoto;
+      this.locker = locker;
     }
   
     loadSchedule(schedule: Schedule): this {
